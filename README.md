@@ -5,6 +5,9 @@
 
 > 包名带 `-win` 是因为二进制只覆盖 Windows x64；其他平台需要各自的构建与平台包。
 
+仓库只含源码：WeKnora 二进制与 `web/`、`config/`、`migrations/` 是分发产物，不入库。
+完整包（含 exe）见 [Releases](https://github.com/huangmiuXyz/dsh-weknora-win/releases)。
+
 - 二进制与资源**随包分发**，用户不需要单独下载 WeKnora，也不需要 Go / Docker / 前端构建。
 - 工具是幂等的：已经在跑就复用，绝不重复启动第二个实例。
 - 默认只监听 `127.0.0.1`，数据写在 `$DSH_HOME/weknora`，不碰 `node_modules`。
@@ -12,10 +15,18 @@
 
 ## 安装
 
+从 [Releases](https://github.com/huangmiuXyz/dsh-weknora-win/releases) 下载 `dsh-weknora-win-0.1.0.tgz`：
+
+```sh
+dsh plugin --profile <name> add ./dsh-weknora-win-0.1.0.tgz
+dsh --profile <name>             # 或重启 DSH
+```
+
+或者本地打包：
+
 ```sh
 pnpm pack                        # 产出 dsh-weknora-win-0.1.0.tgz（约 89 MB）
 dsh plugin --profile <name> add ./dsh-weknora-win-0.1.0.tgz
-dsh --profile <name>             # 或重启 DSH
 ```
 
 安装后工具列表里会出现 `weknora_run`。第一次调用会建库并跑迁移（通常几秒），之后
@@ -41,6 +52,20 @@ weknora_run()  →  { running, baseUrl, port, state, host, dataDir, startupMs?, 
 失败会抛错，消息里带子进程最近 20 行输出（Go 的 panic 一行就能定位）。
 
 首次打开页面需要在 WeKnora 里**注册一个本地账号**，这是它自身的行为；工具只负责把服务拉起来。
+
+## 工具卡片
+
+`weknora_run` 在 Web GUI 里会渲染成一张卡片：
+
+- **未配置 API Key**：显示输入框。这次调用会**挂起等你保存**（最多 5 分钟），保存成功后
+  调用立即返回；超时则以 `apiKeyConfigured: false` 返回，卡片上会说明原因。
+- **已配置**：显示掩码 `sk-****xxxx` 与「更换」。
+- **在浏览器打开**：由 host 侧交给系统默认浏览器（Windows 用 `cmd /c start`），不依赖
+  GUI 自己的 `window.open`。
+
+保存时先用 `GET /api/v1/knowledge-bases` 校验这把 Key，再把 `WEKNORA_API_KEY` 与
+`WEKNORA_BASE_URL` 写入当前进程和 Windows 用户环境变量（`setx`）；官方检索插件
+`@wxg-prc-cpg/dsh-weknora` 下次启动时按环境变量读取。
 
 ## 配置
 
